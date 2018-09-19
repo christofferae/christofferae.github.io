@@ -5,11 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
     ul {
-        columns: 2;
-        list-style: none;
-        padding-left: 0.5em;
+    columns: 2;
+    list-style: none;
+    padding-left: 0.5em;
     }
-    </style>
+    textarea {
+    width: 100%;
+    }
+    button {
+    margin: 0.5em;
+    }
+</style>
   </head>
   <body>
     <div>
@@ -42,7 +48,7 @@
       <button id="ingredient_button">Add</button>
     </div>
     <div>
-      	  <button id="export" type="checkbox">Export</button>
+	  <button id="export" type="checkbox">Export</button>
 	  <button id="import" type="checkbox">Import</button>
 	  <label>Key:</label><input type="text" id="mystore" />
     </div>
@@ -53,11 +59,11 @@
 // HTML elements
 var ingredients = document.getElementById('ingredients')
 var ingredients_list = document.getElementById('ingredients_list')
-
+var ingredient_quantity = document.getElementById('ingredient_quantity')
 var ingredient_value = document.getElementById('ingredient_value')
 var ingredient_button = document.getElementById('ingredient_button')
-
 var ingredients_added = document.getElementById('ingredients_added')
+
 var recipe_button = document.getElementById('recipe_button')
 var recipe_name = document.getElementById('recipe_name')
 var recipe_description = document.getElementById('recipe_description')
@@ -175,6 +181,7 @@ var display_recipes = () => {
 	    var p = document.createElement('p')
 
 	    var remove = document.createElement('button')
+	    var update = document.createElement('button')
 
 	    name.innerHTML = cursor.value.name
 
@@ -209,11 +216,17 @@ var display_recipes = () => {
 		recipe_remove(event.target.parentNode.id)
 	    }
 
+	    update.innerHTML = 'Update'
+	    update.onclick = (event) => {
+		recipe_update(event.target.parentNode.id)
+	    }
+
 	    details.id = cursor.value.name
 	    details.appendChild(name)
 	    details.appendChild(ul)
 	    details.appendChild(p)
 	    details.appendChild(remove)
+	    details.appendChild(update)
 
 	    if(ingredient_available.checked) {
 		if(available) {
@@ -308,6 +321,26 @@ function recipe_remove(name) {
     objectStore.delete(name)
 }
 
+function recipe_update(name) {
+
+    var transaction = db.transaction(['recipe']).objectStore('recipe').get(name)
+    transaction.onsuccess = () => {
+	recipe_name.value = transaction.result.name
+	recipe_description.value = transaction.result.description
+
+	transaction.result.ingredients.map((ingredient) => {
+	    ingredient_quantity.value = ingredient.quantity
+	    ingredients_list.value = ingredient.name
+	    if( ingredients_list.value )
+		ingredients_list.dispatchEvent(new Event('change'))
+	})
+    }
+    transaction.onerror = (e) => {
+	console.log('failed to update recipe')
+	console.log(e)
+    }
+}
+
 // Actions
 
 ingredient_available.addEventListener('change', (event) => {
@@ -329,8 +362,6 @@ ingredient_button.onclick = () => {
 }
 
 ingredients_list.onchange = (event) => {
-
-    var ingredient_quantity = document.getElementById('ingredient_quantity')
 
     var li = document.createElement('li')
     var text = document.createElement('span')
@@ -391,7 +422,7 @@ recipe_button.onclick = () => {
 	description: recipe_description.value,
 	ingredients: ingredients
     }
-    objectStore.add(recipe)
+    objectStore.put(recipe)
 }
 
 export_button.onclick = () => {
@@ -450,7 +481,7 @@ import_button.onclick = () => {
 		var data, objectStore
 
 		data = JSON.parse(this.responseText)
-		
+
 		objectStore = db.transaction('ingredients','readwrite').objectStore('ingredients')
 
 		data.ingredients.map((ingredient) => {
