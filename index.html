@@ -1,0 +1,485 @@
+<!doctype html>
+<html>
+    <head>
+    <title>Recipes</title>
+    <style>
+    summary {
+	
+    }
+    div {
+        margin: 5px;
+    }
+    ul {
+        columns: 2;
+        list-style: none;
+    }
+    </style>
+  </head>
+  <body>
+    <div>
+      <div>
+	<fieldset>
+	  <label>Search:</label><input id="ingredient_search">
+	  <label>Available</label><input id="ingredient_available" type="checkbox">
+	</fieldset>
+      </div>
+      <div id="recipes">
+      </div>
+      <fieldset>
+	<legend>New recipe</legend>
+	<label>Name:</label><br>
+	<input id="recipe_name">
+	<ul id="ingredients_added">
+	</ul>
+	<label>Quantity:<br>
+	</label><input size="5" id="ingredient_quantity">
+	<select id="ingredients_list"></select><br/>
+	<label>Preperation:<br>
+	</label><textarea id="recipe_description"></textarea>
+	<button id="recipe_button">Add</button>
+	</fieldset>
+    </div>
+    <div>
+      <ul id="ingredients">
+      </ul>
+      <label>Ingredient:</label><input id="ingredient_value">
+      <button id="ingredient_button">Add</button>
+    </div>
+    <div>
+      	  <button id="export" type="checkbox">Export</button>
+	  <button id="import" type="checkbox">Import</button>
+	  <label>Key:</label><input type="text" id="mystore" />
+    </div>
+  </body>
+  <script>
+    console.log('staring..')
+
+// HTML elements
+var ingredients = document.getElementById('ingredients')
+var ingredients_list = document.getElementById('ingredients_list')
+
+var ingredient_value = document.getElementById('ingredient_value')
+var ingredient_button = document.getElementById('ingredient_button')
+
+var ingredients_added = document.getElementById('ingredients_added')
+var recipe_button = document.getElementById('recipe_button')
+var recipe_name = document.getElementById('recipe_name')
+var recipe_description = document.getElementById('recipe_description')
+
+var recipes = document.getElementById('recipes')
+
+var ingredient_search = document.getElementById('ingredient_search')
+
+var ingredient_available = document.getElementById('ingredient_available')
+
+var export_button = document.getElementById('export')
+var import_button = document.getElementById('import')
+
+var mystore = document.getElementById('mystore')
+
+// Local Database
+var db
+
+var dbname = 'recipe'
+
+var indexedDB = window.indexedDB
+
+var open = indexedDB.open(dbname,1)
+
+open.onupgradeneeded = (event) => {
+
+    console.log('upgrading')
+
+    var db = event.target.result
+
+    db.onerror = (event) => {
+	console.log('error')
+    }
+
+    var objectStore = db.createObjectStore('ingredients', {keyPath: 'name'})
+
+    objectStore.createIndex('name', 'name', {unique: true})
+    objectStore.createIndex('available', 'available', {unique: false})
+
+    objectStore = db.createObjectStore('recipe', {keyPath: 'name'})
+    objectStore.createIndex('name', 'name', {unique: true})
+    objectStore.createIndex('ingredients', 'ingredients', {unique: false})
+    objectStore.createIndex('description', 'description', {unique: false})
+}
+
+open.onsuccess = () => {
+
+    db = open.result
+    console.log('success')
+
+    display_ingredients()
+	.then( () => {
+	    display_recipes()
+	})
+}
+
+open.onerror = () => {
+    console.log('error..')
+}
+
+mystore.value = localStorage.getItem('mystore')
+
+// Functions
+
+var add_ingredient = (name,available) => {
+
+    var transaction = db.transaction(['ingredients'], 'readwrite')
+
+    transaction.oncomplete = (event) => {
+	console.log('data added, updating list')
+	display_ingredients()
+    }
+    transaction.onerror = (event) => {
+	console.log('failed to add ingredient')
+    }
+    var objectStore = transaction.objectStore('ingredients')
+
+    objectStore.add({
+	name: name,
+	available: available
+    })
+}
+
+var update_ingredient = (event) => {
+
+    var objectStore = db.transaction('ingredients','readwrite').objectStore('ingredients')
+
+    objectStore.put({
+	name: event.target.id,
+	available: event.target.checked
+    })
+    display_ingredients()
+	.then( () => {
+	    display_recipes()
+	})
+}
+
+var display_recipes = () => {
+
+    recipes.innerHTML = ''
+
+    var objectStore = db.transaction('recipe').objectStore('recipe')
+
+    var search_string = ingredient_search.value
+
+    objectStore.openCursor().onsuccess = (event) => {
+
+	var cursor = event.target.result
+
+	if(cursor) {
+
+	    var details = document.createElement('details')
+	    var name = document.createElement('summary')
+	    var ul = document.createElement('ul')
+	    var p = document.createElement('p')
+
+	    var remove = document.createElement('button')
+
+	    name.innerHTML = cursor.value.name
+
+	    var available = true
+
+	    var found_ingredient = false
+
+	    for(var i = 0; i < cursor.value.ingredients.length; i++) {
+
+		var li = document.createElement('li')
+		li.innerHTML = cursor.value.ingredients[i].quantity + ' ' + cursor.value.ingredients[i].name
+		ul.appendChild(li)
+
+		available &= document.getElementById(cursor.value.ingredients[i].name).checked
+
+		var ingredient = document.getElementById(cursor.value.ingredients[i].name)
+		ingredient.parentNode.data.count++
+		ingredient.parentNode.getElementsByTagName('label')[0].innerHTML =
+		    cursor.value.ingredients[i].name + ' (' + ingredient.parentNode.data.count + ')'
+
+		if(search_string) {
+		    search_string.split(/ +/).map((search_ingredient) => {
+			found_ingredient |= (cursor.value.ingredients[i].name.toLowerCase().search(search_ingredient.toLowerCase()) >= 0)
+		    })
+		}
+	    }
+
+	    p.innerHTML = cursor.value.description
+
+	    remove.innerHTML = 'Remove'
+	    remove.onclick = (event) => {
+		recipe_remove(event.target.parentNode.id)
+	    }
+
+	    details.id = cursor.value.name
+	    details.appendChild(name)
+	    details.appendChild(ul)
+	    details.appendChild(p)
+	    details.appendChild(remove)
+
+	    if(ingredient_available.checked) {
+		if(available) {
+		    if(search_string) {
+			if(found_ingredient) {
+			    recipes.appendChild(details)
+			}
+		    }
+		    else
+			recipes.appendChild(details)
+		}
+	    }
+	    else {
+		if(search_string) {
+		    if(found_ingredient) {
+			recipes.appendChild(details)
+		    }
+		}
+		else
+		    recipes.appendChild(details)
+	    }
+	    cursor.continue()
+	}
+    }
+}
+
+function display_ingredients() {
+
+    return new Promise((resolve,reject) => {
+
+	ingredients.innerHTML = ''
+
+	ingredients_list.innerHTML = '<option/>'
+
+	var objectStore = db.transaction('ingredients').objectStore('ingredients')
+
+	objectStore.openCursor().onerror = (event) => {
+	    reject(event)
+	}
+
+	objectStore.openCursor().onsuccess = (event) => {
+
+	    var cursor = event.target.result
+
+	    if(cursor) {
+
+		var li = document.createElement('li')
+		var input = document.createElement('input')
+		var label = document.createElement('label')
+
+		input.setAttribute('type','checkbox')
+		input.setAttribute('id', cursor.value.name)
+		input.onchange = update_ingredient
+		input.checked = cursor.value.available
+
+		label.setAttribute('for',cursor.value.name)
+		label.innerHTML = cursor.value.name
+
+		li.appendChild(input)
+		li.appendChild(label)
+
+		li.data = {
+		    count: 0
+		}
+
+		ingredients.appendChild(li)
+
+		var option = document.createElement('option')
+		option.innerHTML = cursor.value.name
+		ingredients_list.appendChild(option)
+
+		cursor.continue()
+	    }
+	    else
+		resolve()
+	}
+    })
+}
+
+function recipe_remove(name) {
+
+    var transaction = db.transaction(['recipe'], 'readwrite')
+    transaction.oncomplete = (event) => {
+	display_recipes()
+    }
+    transaction.onerror = (e) => {
+	console.log('failed to remove recipe')
+	console.log(e)
+    }
+    var objectStore = transaction.objectStore('recipe')
+
+    objectStore.delete(name)
+}
+
+// Actions
+
+ingredient_available.addEventListener('change', (event) => {
+    event.preventDefault()
+    display_recipes()
+})
+
+ingredient_search.addEventListener('keyup', (event) => {
+
+    event.preventDefault()
+    display_recipes()
+})
+
+ingredient_button.onclick = () => {
+
+    add_ingredient(ingredient_value.value,true)
+
+    ingredient_value.value = ''
+}
+
+ingredients_list.onchange = (event) => {
+
+    var ingredient_quantity = document.getElementById('ingredient_quantity')
+
+    var li = document.createElement('li')
+    var text = document.createElement('span')
+    var remove = document.createElement('a')
+
+    text.innerHTML = ingredient_quantity.value + ' ' + ingredients_list.value
+    li.data = {
+	name: ingredients_list.value,
+	quantity:ingredient_quantity.value
+    }
+    li.appendChild(text)
+
+    remove.setAttribute('href','#')
+    remove.innerHTML = ' remove'
+    remove.onclick = (event) => {
+
+	event.target.parentNode.remove()
+    }
+
+    li.appendChild(remove)
+
+    ingredients_added.appendChild(li)
+}
+
+recipe_button.onclick = () => {
+
+    var recipe_name = document.getElementById('recipe_name')
+
+    if(recipe_name.value.length == 0)
+	return
+
+    var transaction = db.transaction(['recipe'], 'readwrite')
+    transaction.oncomplete = (event) => {
+	console.log('recipe added, updating recipe list')
+	ingredients_added.innerHTML = ''
+	recipe_name.value = ''
+	recipe_description.value = ''
+	display_recipes()
+    }
+    transaction.onerror = (e) => {
+	console.log('failed to add recipe')
+	console.log(e)
+    }
+    var objectStore = transaction.objectStore('recipe')
+
+    var list = ingredients_added.getElementsByTagName('li')
+    var ingredients = []
+
+    for(var i = 0; i < list.length; i++) {
+	ingredients.push({
+	    name: list[i].data.name,
+	    quantity: list[i].data.quantity
+	})
+    }
+
+    var recipe = {
+	name: recipe_name.value,
+	description: recipe_description.value,
+	ingredients: ingredients
+    }
+    objectStore.add(recipe)
+}
+
+export_button.onclick = () => {
+
+    export_button.disabled = true
+
+    var ingredients = db.transaction('ingredients').objectStore('ingredients').getAll()
+
+    ingredients.onsuccess = function() {
+
+	var recipes = db.transaction('recipe').objectStore('recipe').getAll()
+
+	recipes.onsuccess = function() {
+
+	    var payload = {
+		ingredients:ingredients.result,
+		recipes:recipes.result
+	    }
+
+	    var xhttp = new XMLHttpRequest()
+	    xhttp.onreadystatechange = function() {
+		if( this.readyState == 4 && this.status == 200 ) {
+		    export_button.disabled = false
+		}
+		if( this.readyState == 4 && this.status == 201 ) {
+		    var data = JSON.parse(this.responseText)
+		    mystore.value = data.uri.split('/').pop()
+		    mystore.dispatchEvent(new Event('change'))
+		    export_button.disabled = false
+		}
+	    }
+	    if( localStorage.getItem('mystore') )
+		xhttp.open('PUT', 'https://api.myjson.com/bins/' + localStorage.getItem('mystore'), true)
+	    else
+		xhttp.open('POST', 'https://api.myjson.com/bins', true)
+	    xhttp.setRequestHeader('Content-type', 'application/json; charset=utf-8')
+	    xhttp.send(JSON.stringify(payload))
+	}
+    }
+}
+
+mystore.onchange = () => {
+    localStorage.setItem('mystore',mystore.value)
+}
+
+import_button.onclick = () => {
+
+    if( localStorage.getItem('mystore') ) {
+
+	import_button.disabled = true
+
+	var xhttp = new XMLHttpRequest()
+	xhttp.onreadystatechange = function() {
+	    if( this.readyState == 4 && this.status == 200 ) {
+
+		var data, objectStore
+
+		data = JSON.parse(this.responseText)
+		
+		objectStore = db.transaction('ingredients','readwrite').objectStore('ingredients')
+
+		data.ingredients.map((ingredient) => {
+		    objectStore.put(ingredient)
+		})
+
+		objectStore = db.transaction('recipe','readwrite').objectStore('recipe')
+
+		data.recipes.map((recipe) => {
+		    objectStore.put(recipe)
+		})
+
+		display_ingredients()
+		    .then( () => {
+			display_recipes()
+		    })
+
+		import_button.disabled = false
+	    }
+	}
+	xhttp.open('GET', 'https://api.myjson.com/bins/' + localStorage.getItem('mystore'), true)
+	xhttp.setRequestHeader('Content-type', 'application/json; charset=utf-8')
+	xhttp.send()
+    }
+}
+
+</script>
+</html>
