@@ -15,6 +15,12 @@
     button {
     margin: 0.5em;
     }
+    .edit {
+	display: none;
+    }
+    .edit.is-visible {
+	display: inline;
+    }
 </style>
   </head>
   <body>
@@ -48,9 +54,10 @@
       <button id="ingredient_button">Add</button>
     </div>
     <div>
-	  <button id="export" type="checkbox">Export</button>
-	  <button id="import" type="checkbox">Import</button>
-	  <label>Key:</label><input type="text" id="mystore" />
+      <button id="edit">Toggle Edit</button>
+      <button id="export">Export</button>
+      <button id="import">Import</button>
+      <label>Key:</label><input type="text" id="mystore" />
     </div>
   </body>
   <script>
@@ -76,6 +83,8 @@ var ingredient_available = document.getElementById('ingredient_available')
 
 var export_button = document.getElementById('export')
 var import_button = document.getElementById('import')
+
+var edit_button = document.getElementById('edit')
 
 var mystore = document.getElementById('mystore')
 
@@ -215,11 +224,13 @@ var display_recipes = () => {
 	    remove.onclick = (event) => {
 		recipe_remove(event.target.parentNode.id)
 	    }
+	    remove.classList.add('edit')
 
 	    update.innerHTML = 'Update'
 	    update.onclick = (event) => {
 		recipe_update(event.target.parentNode.id)
 	    }
+	    update.classList.add('edit')
 
 	    details.id = cursor.value.name
 	    details.appendChild(name)
@@ -508,5 +519,11 @@ import_button.onclick = () => {
     }
 }
 
+edit_button.onclick = () => {
+
+    for(var element of document.getElementsByClassName('edit')) {
+	element.classList.toggle('is-visible');
+    }
+}
 </script>
 </html>
