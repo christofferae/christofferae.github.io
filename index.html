@@ -44,7 +44,9 @@
 	<select id="ingredients_list"></select><br/>
 	<label>Preperation:<br>
 	</label><textarea id="recipe_description"></textarea>
-	<button id="recipe_button">Add</button>
+	<img id="recipe_image"></img>
+	<input id="image" type="file" accept="image/*" capture="environment">
+	<br/><button id="recipe_add">Add</button>
 	</fieldset>
     </div>
     <div>
@@ -57,7 +59,7 @@
       <button id="edit">Toggle Edit</button>
       <button id="export">Export</button>
       <button id="import">Import</button>
-      <label>Key:</label><input type="text" id="mystore" />
+      <label>Key:</label><input type="text" id="mystore">
     </div>
   </body>
   <script>
@@ -71,9 +73,10 @@ var ingredient_value = document.getElementById('ingredient_value')
 var ingredient_button = document.getElementById('ingredient_button')
 var ingredients_added = document.getElementById('ingredients_added')
 
-var recipe_button = document.getElementById('recipe_button')
+var recipe_add = document.getElementById('recipe_add')
 var recipe_name = document.getElementById('recipe_name')
 var recipe_description = document.getElementById('recipe_description')
+var recipe_image = document.getElementById('recipe_image')
 
 var recipes = document.getElementById('recipes')
 
@@ -189,6 +192,8 @@ var display_recipes = () => {
 	    var ul = document.createElement('ul')
 	    var p = document.createElement('p')
 
+	    var image = document.createElement('img')
+
 	    var remove = document.createElement('button')
 	    var update = document.createElement('button')
 
@@ -220,6 +225,9 @@ var display_recipes = () => {
 
 	    p.innerHTML = cursor.value.description
 
+	    if( cursor.value.image )
+		image.src = cursor.value.image
+
 	    remove.innerHTML = 'Remove'
 	    remove.onclick = (event) => {
 		recipe_remove(event.target.parentNode.id)
@@ -236,6 +244,7 @@ var display_recipes = () => {
 	    details.appendChild(name)
 	    details.appendChild(ul)
 	    details.appendChild(p)
+	    details.appendChild(image)
 	    details.appendChild(remove)
 	    details.appendChild(update)
 
@@ -397,7 +406,7 @@ ingredients_list.onchange = (event) => {
     ingredients_added.appendChild(li)
 }
 
-recipe_button.onclick = () => {
+recipe_add.onclick = () => {
 
     var recipe_name = document.getElementById('recipe_name')
 
@@ -431,6 +440,7 @@ recipe_button.onclick = () => {
     var recipe = {
 	name: recipe_name.value,
 	description: recipe_description.value,
+	image: recipe_image.src,
 	ingredients: ingredients
     }
     objectStore.put(recipe)
@@ -525,5 +535,21 @@ edit_button.onclick = () => {
 	element.classList.toggle('is-visible');
     }
 }
+
+image.onchange = () => {
+
+    var xhttp = new XMLHttpRequest()
+    xhttp.open('POST', 'https://api.imgur.com/3/image', true)
+    xhttp.setRequestHeader("Content-Type", "image/png");
+    xhttp.setRequestHeader("Authorization", "Client-ID 419390f232102b2");
+    xhttp.onreadystatechange = function() {
+	if( this.readyState == 4 && this.status == 200 ) {
+	    var data = JSON.parse(this.responseText).data
+	    recipe_image.src = data.link
+	}
+    }
+    xhttp.send(image.files[0])
+}
+
 </script>
 </html>
