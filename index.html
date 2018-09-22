@@ -353,6 +353,12 @@ function recipe_update(name) {
 	recipe_name.value = transaction.result.name
 	recipe_description.value = transaction.result.description
 
+	if( transaction.result.image )
+	    recipe_image.src = transaction.result.image
+	else
+	    recipe_image.src = ''
+
+	ingredients_added.innerHTML = ''
 	transaction.result.ingredients.map((ingredient) => {
 	    ingredient_quantity.value = ingredient.quantity
 	    ingredients_list.value = ingredient.name
